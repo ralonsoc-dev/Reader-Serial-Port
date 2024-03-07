@@ -7,6 +7,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import Fourier
+import serial
+import threading
 
 seleccionados = []
 
@@ -16,15 +19,16 @@ class Ventana(object):
         ctk.set_default_color_theme("blue")
         self.app = ctk.CTk()
         self.configuracion_principal()
-
+        self.grafica_fourier = Fourier.grafica_fourier()
+        
         self.frame_principal = ctk.CTkFrame(master=self.app, width=600, height=400, corner_radius=10, fg_color="transparent")
         self.frame_principal.pack(side="top", padx=20, pady=30)
 
         self.frame_footer = ctk.CTkFrame(master=self.app, width=1200, height=700, corner_radius=10, fg_color="transparent")
         self.frame_footer.pack(side="bottom", padx=10, pady=0)
 
-        self.generar_frame1()
-        self.generar_frame2()
+        self.generar_frame_izquierda()
+        self.generar_frame_derecha()
         self.generar_frame3()
         self.generar_frame4()
           
@@ -43,7 +47,7 @@ class Ventana(object):
         y_position = (screen_height // 2) - (window_height // 2)
         self.app.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
 
-    def generar_frame1(self):
+    def generar_frame_izquierda(self):
         # **********************************************
         # ** FRAME + BOTONES DE GRABACION SERIAL PORT **
         # **********************************************
@@ -75,32 +79,14 @@ class Ventana(object):
         self.btn_parar.configure(state="disabled")
         self.btn_generar.configure(state="disabled")
 
-    def generar_frame2(self):
+    def generar_frame_derecha(self):
          # ************************************
         # ** FRAME TRANSFORMACION DE FOURIER **
         # *************************************
         self.frame_derecha = ctk.CTkFrame(master=self.frame_principal, width=600, height=400, corner_radius=10)
         self.frame_derecha.pack(side="right", padx=25, pady=30)
 
-        datos_procesados = []
-        datos_procesados1 = [1, 2, 3, 4, 5, 4, 3, 2, 1]
-        transformada = None
-        if len(datos_procesados) > 0:
-            transformada = np.fft.fft(datos_procesados)
-        
-        # Creo la figura
-        fig = Figure(figsize=(7, 5), dpi=100)
-        ax = fig.add_subplot(111)
-        if transformada is not None:
-            ax.plot(np.abs(transformada))
-        ax.set_xlabel('Frecuencia')
-        ax.set_ylabel('Amplitud')
-        ax.set_title('Transformada de Fourier')
-
-        # Creo un canvas para mostrar la transformada
-        canvas = FigureCanvasTkAgg(fig, master=self.frame_derecha)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.grafica_fourier.pintar_grafica(self.frame_derecha)
 
 
     def generar_frame3(self):
@@ -187,13 +173,14 @@ class Ventana(object):
         checkbox_hex.pack(side="left", padx=20)
         
         # Genero boton exportar
-        btn_export = ctk.CTkButton(master=self.frame_export_center, text="Exportar", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_exportar)
-        btn_export.pack(side="left", padx=20)
+        self.btn_export = ctk.CTkButton(master=self.frame_export_center, text="Exportar", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_exportar)
+        self.btn_export.pack(side="left", padx=20)
+        self.btn_export.configure(state="disabled")
         
-          
+              
     def funcion_grabar(self):
         print("Función grabar")
-
+        self.tk_textarea.delete('1.0', tk.END)
         puerto = self.combobox_puerto.get()
         baud = self.combobox_baud.get()
         err = ""
@@ -214,18 +201,47 @@ class Ventana(object):
             self.btn_grabar.configure(state="disabled")
             self.btn_parar.configure(state="normal")
             self.btn_generar.configure(state="disabled")
+        
+            ## Comienzo a leer puerto serie
+            self.detener_lectura = False
+            self.serial_reader = serial.Serial(port=puerto, baudrate=baud)
+            self.hilo_lectura = threading.Thread(target=self.leer_puerto_serie, args=(self.serial_reader,))
+            self.hilo_lectura.start()
+
+    def leer_puerto_serie(self, serial_reader = None):
+        while not self.detener_lectura:
+            if serial_reader.in_waiting > 0:
+                texto_recibido = serial_reader.readline().decode().strip()
+                print(texto_recibido)
+                self.tk_textarea.insert(tk.END, texto_recibido + '\n')
+                self.tk_textarea.see(tk.END)     
 
     def funcion_detener(self):
+        self.detener_lectura = True
+        if self.hilo_lectura and self.hilo_lectura.is_alive():
+            self.hilo_lectura.join() 
+        self.serial_reader.close()
         print("Función detener")
         self.btn_grabar.configure(state="normal")
         self.btn_parar.configure(state="disabled")
         if self.tk_textarea.get("1.0", "end-1c"):
             self.btn_generar.configure(state="normal")
+        
+        
+        
 
-
+        
     def funcion_generar(self):
         print("Función guardar")
+        contenido = self.tk_textarea.get("1.0", tk.END)  
+        filas = contenido.strip().split('\n')
+        datos = [list(map(float, fila.split(','))) for fila in filas]
+        self.btn_export.configure(state="normal")
 
+        # Convertir los datos a un arreglo de NumPy
+        datos_np = np.array(datos)
+        self.grafica_fourier.datos_procesados = datos_np
+        self.grafica_fourier.pintar_grafica(self.frame_derecha)
         
 
         
@@ -239,8 +255,12 @@ class Ventana(object):
         for checkbox in self.frame_export_center.winfo_children():
             if isinstance(checkbox, ctk.CTkCheckBox) and checkbox.get() == True:
                 seleccionados.append(checkbox._text)
-
-        print("Seleccionados:", seleccionados)
+                if checkbox._text == "HEX":
+                    self.grafica_fourier.exportar_hex()
+                elif checkbox._text == "CSV":
+                    self.grafica_fourier.exportar_txt("csv")
+                else:
+                   self.grafica_fourier.exportar_txt("txt") 
     
     def mostrar_mensaje(self, msgTipe, msgContent):
         tk.messagebox.showinfo(msgTipe, msgContent)
