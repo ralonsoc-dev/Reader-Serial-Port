@@ -10,15 +10,17 @@ from matplotlib.figure import Figure
 import Fourier
 import serial
 import threading
-
+import time
 seleccionados = []
 
 class Ventana(object):
     def __init__(self):
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
+        
         self.app = ctk.CTk()
         self.configuracion_principal()
+        
         self.grafica_fourier = Fourier.grafica_fourier()
         
         self.frame_principal = ctk.CTkFrame(master=self.app, width=600, height=400, corner_radius=10, fg_color="transparent")
@@ -31,22 +33,45 @@ class Ventana(object):
         self.generar_frame_derecha()
         self.generar_frame3()
         self.generar_frame4()
+        
+        #self.app.after(2000, self.agrandar())
+        
           
     def run(self):
         self.app.mainloop()
+    
+    def agrandar(self):
+        self.app.state('zoomed')
 
     def configuracion_principal(self):
         self.app.title("Grabadora de Puerto Serie")
+        # self.app.attributes('-fullscreen', True)  # ESTO PONE VENTANA MAXIMIZADA
 
         # ** Cojo el tamaño de mi pantalla y hago el calculo para pintar la ventana en medio **
         screen_width = self.app.winfo_screenwidth()
         screen_height = self.app.winfo_screenheight()
-        window_width = 1400
-        window_height = 900
+        
+        # Para que este a pantalla completa 
+        #self.app.geometry("%dx%d" % (screen_width, screen_height))
+        
+        # Esto de abajo para si la quiero de X tamaño y centrada
+        window_width = screen_width
+        window_height = screen_height
         x_position = (screen_width // 2) - (window_width // 2)
         y_position = (screen_height // 2) - (window_height // 2)
         self.app.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+        
+        
+        
+        
+    def toggleFullScreen(self, event):
+        self.fullScreenState = not self.fullScreenState
+        self.app.attributes("-fullscreen", self.fullScreenState)
 
+    def quitFullScreen(self, event):
+        self.fullScreenState = False
+        self.app.attributes("-fullscreen", self.fullScreenState)
+        
     def generar_frame_izquierda(self):
         # **********************************************
         # ** FRAME + BOTONES DE GRABACION SERIAL PORT **
@@ -265,5 +290,3 @@ class Ventana(object):
     def mostrar_mensaje(self, msgTipe, msgContent):
         tk.messagebox.showinfo(msgTipe, msgContent)
 
-ventana = Ventana()
-ventana.run()
