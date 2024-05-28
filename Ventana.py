@@ -55,10 +55,10 @@ class Ventana(object):
         #self.app.geometry("%dx%d" % (screen_width, screen_height))
         
         # Esto de abajo para si la quiero de X tamaño y centrada
-        window_width = screen_width
-        window_height = screen_height
+        window_width = screen_width - 10
+        window_height = screen_height - 100
         x_position = (screen_width // 2) - (window_width // 2)
-        y_position = (screen_height // 2) - (window_height // 2)
+        y_position = (screen_height // 2) - (window_height // 2) - 35
         self.app.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
         
@@ -236,7 +236,7 @@ class Ventana(object):
     def leer_puerto_serie(self, serial_reader = None):
         while not self.detener_lectura:
             if serial_reader.in_waiting > 0:
-                texto_recibido = serial_reader.readline().decode().strip()
+                texto_recibido = serial_reader.readline().decode('utf-8', errors='ignore').strip()
                 print(texto_recibido)
                 self.tk_textarea.insert(tk.END, texto_recibido + '\n')
                 self.tk_textarea.see(tk.END)     
@@ -260,7 +260,7 @@ class Ventana(object):
         print("Función guardar")
         contenido = self.tk_textarea.get("1.0", tk.END)  
         filas = contenido.strip().split('\n')
-        datos = [list(map(float, fila.split(','))) for fila in filas]
+        datos = [list(map(float, fila.split(';'))) for fila in filas]
         self.btn_export.configure(state="normal")
 
         # Convertir los datos a un arreglo de NumPy
