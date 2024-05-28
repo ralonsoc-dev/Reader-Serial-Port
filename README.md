@@ -9,6 +9,7 @@ Para poder utilizar la herramienta necesitamos instalar los requerimientos para 
 
 	pip install -r requirements.txt
 o
+
 	pip3 install -r requirements.txt
 
 Dependiendo la versión de python que tengamos instalada.
