@@ -1,7 +1,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import serial.tools.list_ports
-from PIL import Image
+from PIL import Image, ImageTk
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,7 +35,10 @@ class Ventana(object):
         self.generar_frame4()
         
         #self.app.after(2000, self.agrandar())
-        
+        # Inicialización del atributo hilo_lectura
+        self.serial_reader = None
+        self.hilo_lectura = None
+        self.detener_lectura = False
           
     def run(self):
         self.app.mainloop()
@@ -60,9 +63,7 @@ class Ventana(object):
         x_position = (screen_width // 2) - (window_width // 2)
         y_position = (screen_height // 2) - (window_height // 2) - 35
         self.app.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
-        
-        
-        
+
         
     def toggleFullScreen(self, event):
         self.fullScreenState = not self.fullScreenState
@@ -95,24 +96,54 @@ class Ventana(object):
         self.btn_grabar = ctk.CTkButton(master=self.button_frame, text="Grabar", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_grabar)
         self.btn_grabar.pack(side="left", padx=20)
 
-        self.btn_parar = ctk.CTkButton(master=self.button_frame, text="Detener", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_detener)
-        self.btn_parar.pack(side="left", padx=20)
+        # self.btn_parar = ctk.CTkButton(master=self.button_frame, text="Detener", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_detener)
+        # self.btn_parar.pack(side="left", padx=20)
 
         self.btn_generar = ctk.CTkButton(master=self.button_frame, text="Generar", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_generar)
         self.btn_generar.pack(side="left", padx=20)
 
-        self.btn_parar.configure(state="disabled")
-        self.btn_generar.configure(state="disabled")
+        # self.btn_parar.configure(state="disabled")
+        # self.btn_generar.configure(state="disabled")
 
     def generar_frame_derecha(self):
-         # ************************************
-        # ** FRAME TRANSFORMACION DE FOURIER **
-        # *************************************
+         # ***************************************
+        # ** FRAME TRANSFORMACION DE ABECEDARIO **
+        # ****************************************
         self.frame_derecha = ctk.CTkFrame(master=self.frame_principal, width=600, height=400, corner_radius=10)
         self.frame_derecha.pack(side="right", padx=25, pady=30)
 
-        self.grafica_fourier.pintar_grafica(self.frame_derecha)
+        # Ruta de imagenes y total de botones
+        images_path = "./images"
+        num_botones = 27
 
+        # Crear botones en rejilla
+        for i in range(num_botones):
+            # Calcular posición en la rejilla
+            fila = i // 5
+            columna = i % 5
+
+            # Nombre del archivo de imagen
+            image_filename = f"{i}.png"
+            image_path = os.path.join(images_path, image_filename)
+
+            # Cargar la imagen y crear un objeto ImageTk para Tkinter
+            img = Image.open(image_path)
+            img = img.resize((120, 70), Image.LANCZOS)  # Cambio a Image.LANCZOS para el escalado
+            img_tk = ImageTk.PhotoImage(img)
+            # img_tk = ctk.CTkImage(light_image=img) # Se hace pequeña con este en vez lo de arriba
+
+            # Crear el botón con la imagen
+            btn = ctk.CTkButton(master=self.frame_derecha, image=img_tk, text="", width=120, height=60, bg_color="transparent", command=lambda index=i: self.on_button_click(index))
+            btn.image = img_tk  # Guardar una referencia a la imagen para evitar que sea eliminada por el recolector de basura
+            btn.grid(row=fila, column=columna, padx=5, pady=5)
+
+            # Configurar la imagen en el botón
+            btn.configure(image=img_tk)
+            btn.image = img_tk
+
+    def on_button_click(self, index):
+        abecedario = "abcdefghijklmnñopqrstuvwxyz"
+        print(f"Letra asignada: {abecedario[index]}")
 
     def generar_frame3(self):
         # ************************************************
@@ -120,7 +151,7 @@ class Ventana(object):
         # ************************************************
         self.frame_config = ctk.CTkFrame(master=self.frame_footer, width=self.app.winfo_screenwidth()/2, height=80, corner_radius=10)
         self.frame_config.pack(padx=50, pady=0, expand=True, fill="both")
-        
+
         # Genero el frame centrado
         self.frame_config_center = ctk.CTkFrame(master=self.frame_config, fg_color="transparent")
         self.frame_config_center.pack(expand=True)
@@ -130,12 +161,12 @@ class Ventana(object):
         etiqueta_puerto = ctk.CTkLabel(master=self.frame_config_center, text="puerto", corner_radius=8, font=("Arial", 15, "bold"))
         etiqueta_puerto.pack(side="left", padx=20)
         etiqueta_puerto.configure(text="PUERTO:")
-        
+
         # Genero el combo de los puertos activos
         puertos = self.obtener_puertos_COM_activos()
         self.combobox_puerto = ctk.CTkComboBox(master=self.frame_config_center, values=puertos, state="readonly")
         self.combobox_puerto.pack(side="left", padx=20)
-        
+
         # Cargo la imagen que va a tener el boton buscar
         imagen_path = os.path.join(os.path.dirname(__file__), "./icons/buscar.png")
         imagen = ctk.CTkImage(light_image=Image.open(imagen_path), size=(20, 20) )
@@ -143,12 +174,12 @@ class Ventana(object):
         # Boton para recargar puertos activos
         btn_buscar = ctk.CTkButton(master=self.frame_config_center, image=imagen, text="", font=("Arial", 15, "bold"), width=45, height=45, command=self.buscar_puertos)
         btn_buscar.pack(side="left", padx=20)
-        
+
         # Label Baudios
         etiqueta_baud = ctk.CTkLabel(master=self.frame_config_center, text="baud", corner_radius=8, font=("Arial", 15, "bold"))
         etiqueta_baud.pack(side="left", padx=20)
         etiqueta_baud.configure(text="BAUDIOS:")
-        
+
         # Genero el combo de los baudios
         self.combobox_baud = ctk.CTkComboBox(master=self.frame_config_center, values=[str(value) for value in [300, 600, 750, 1200, 2400, 4800, 9600, 19200, 31250, 38400, 57600, 74880, 115200, 230400, 250000, 460800, 500000, 921600, 1000000, 2000000]], state="readonly")
         self.combobox_baud.pack(side="left", padx=20)
@@ -183,20 +214,20 @@ class Ventana(object):
         etiqueta = ctk.CTkLabel(master=self.frame_export_center, text="Exportar a:", corner_radius=8, font=("Arial", 15, "bold"))
         etiqueta.pack(side="left", padx=20)
         etiqueta.configure(text="EXPORTAR A:")
-        
-        # Genero los checkbox
-        checkbox_txt = ctk.CTkCheckBox(master=self.frame_export_center, text="TXT")
-        checkbox_txt.place(relx = 0.55, rely = 0.4, anchor=tk.CENTER)
-        checkbox_txt.pack(side="left", padx=20)
-        
-        checkbox_csv = ctk.CTkCheckBox(master=self.frame_export_center, text="CSV")
-        checkbox_csv.place(relx = 0.55, rely = 0.5, anchor=tk.CENTER)
-        checkbox_csv.pack(side="left", padx=20)
-        
-        checkbox_hex = ctk.CTkCheckBox(master=self.frame_export_center, text="HEX")
-        checkbox_hex.place(relx = 0.55, rely = 0.5, anchor=tk.CENTER)
-        checkbox_hex.pack(side="left", padx=20)
-        
+
+        # Variable para el radio button
+        self.radio_var = tk.StringVar(value="CSV")
+
+        # Genero el RadioButton
+        self.radio_csv = ctk.CTkRadioButton(
+            master=self.frame_export_center,
+            text="CSV",
+            variable=self.radio_var,
+            value="CSV"
+        )
+        self.radio_csv.place(relx = 0.55, rely = 0.4, anchor=tk.CENTER)
+        self.radio_csv.pack(side="left", padx=20)
+
         # Genero boton exportar
         self.btn_export = ctk.CTkButton(master=self.frame_export_center, text="Exportar", font=("Arial", 15, "bold"), width=120, height=45, command=self.funcion_exportar)
         self.btn_export.pack(side="left", padx=20)
@@ -224,7 +255,7 @@ class Ventana(object):
             print("Valor seleccionado:", baud)
 
             self.btn_grabar.configure(state="disabled")
-            self.btn_parar.configure(state="normal")
+            # self.btn_parar.configure(state="normal")
             self.btn_generar.configure(state="disabled")
         
             ## Comienzo a leer puerto serie
@@ -248,14 +279,10 @@ class Ventana(object):
         self.serial_reader.close()
         print("Función detener")
         self.btn_grabar.configure(state="normal")
-        self.btn_parar.configure(state="disabled")
         if self.tk_textarea.get("1.0", "end-1c"):
             self.btn_generar.configure(state="normal")
         
-        
-        
 
-        
     def funcion_generar(self):
         print("Función guardar")
         contenido = self.tk_textarea.get("1.0", tk.END)  
@@ -267,26 +294,17 @@ class Ventana(object):
         datos_np = np.array(datos)
         self.grafica_fourier.datos_procesados = datos_np
         self.grafica_fourier.pintar_grafica(self.frame_derecha)
-        
 
-        
+    """Obtiene los valores de los checkboxes seleccionados."""
     def funcion_exportar(self):
-        """Obtiene los valores de los checkboxes seleccionados."""
-        global seleccionados
+        print("Exportando datos")
+        if self.radio_var.get() == "CSV":
+            self.grafica_fourier.exportar_txt("CSV")
 
-        seleccionados = []
-        
-        # Recorre todos los checkboxes
-        for checkbox in self.frame_export_center.winfo_children():
-            if isinstance(checkbox, ctk.CTkCheckBox) and checkbox.get() == True:
-                seleccionados.append(checkbox._text)
-                if checkbox._text == "HEX":
-                    self.grafica_fourier.exportar_hex()
-                elif checkbox._text == "CSV":
-                    self.grafica_fourier.exportar_txt("csv")
-                else:
-                   self.grafica_fourier.exportar_txt("txt") 
     
     def mostrar_mensaje(self, msgTipe, msgContent):
         tk.messagebox.showinfo(msgTipe, msgContent)
 
+
+ventana = Ventana()
+ventana.run()

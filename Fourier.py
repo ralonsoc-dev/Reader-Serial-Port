@@ -53,10 +53,3 @@ class grafica_fourier(object):
         with open("datos."+extension, 'w') as f:
             for dato in self.transformada:
                 f.write(f"{dato}\n")
-    
-    def exportar_hex(self):
-        with open("hexadecimal.txt", 'w') as f:
-            for dato in self.transformada:
-                parte_real_hex = int(dato.real).to_bytes(8, byteorder='big').hex()
-                parte_imaginaria_hex = int(dato.imag).to_bytes(8, byteorder='big').hex()
-                f.write(f"{parte_real_hex},{parte_imaginaria_hex}\n")
